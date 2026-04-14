@@ -4,7 +4,7 @@ services:
     runtime: python
     buildCommand: |
       pip install --upgrade pip
-      pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+      pip install torch==2.9.0+cpu --index-url https://download.pytorch.org/whl/cpu
       pip install -r requirements.txt
     startCommand: gunicorn app:app --workers 1 --timeout 180 --bind 0.0.0.0:$PORT
     envVars:
