@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: text-summarization
+    runtime: python
+    buildCommand: |
+      pip install --upgrade pip
+      pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+      pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 1 --timeout 180 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_DEBUG
+        value: false
+      - key: HF_HOME
+        value: /tmp/hf_cache
+      - key: TRANSFORMERS_CACHE
+        value: /tmp/hf_cache
+    plan: free

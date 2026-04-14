@@ -20,12 +20,11 @@ vaderSentiment>=3.3.2
 rake-nltk>=1.0.6
 scikit-learn>=1.4.0
 
-# ── HuggingFace — CPU-only torch to keep image small ──────────────
-# Install torch CPU wheel before transformers to avoid pulling CUDA:
-#   pip install torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
-# On Render, set BUILD_COMMAND or use render.yaml to pass the index-url.
+# ──# HuggingFace Transformers
+# NOTE: torch is installed separately via render.yaml build command
+# using --index-url https://download.pytorch.org/whl/cpu (CPU-only, ~250 MB)
+# to avoid pulling the full CUDA build (~2.5 GB) on cloud servers.
 transformers>=4.38.0
-torch>=2.1.0
 
 # ── File & Web Handling ───────────────────────────────────────────
 PyMuPDF>=1.24.0
