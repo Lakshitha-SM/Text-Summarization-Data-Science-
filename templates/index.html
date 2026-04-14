@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Text Analysis Pro | Advanced Summarization Platform</title>
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-section">
+                <i class="fas fa-brain"></i>
+                <span class="logo-text">AI Pro</span>
+            </div>
+            
+            <ul class="nav-links">
+                <li class="nav-item active" data-tab="summarizer">
+                    <i class="fas fa-magic"></i>
+                    <span class="nav-text">Summarizer</span>
+                </li>
+                <li class="nav-item" data-tab="analytics">
+                    <i class="fas fa-chart-pie"></i>
+                    <span class="nav-text">Analytics</span>
+                </li>
+                <li class="nav-item" data-tab="history">
+                    <i class="fas fa-history"></i>
+                    <span class="nav-text">History</span>
+                </li>
+                <li class="nav-item" data-tab="compare">
+                    <i class="fas fa-columns"></i>
+                    <span class="nav-text">Comparison</span>
+                </li>
+            </ul>
+            
+            <div class="sidebar-spacer" style="flex: 1;"></div>
+            
+            <div class="user-section">
+                <div class="nav-item" id="themeToggle">
+                    <i class="fas fa-moon"></i>
+                    <span class="nav-text">Dark Mode</span>
+                </div>
+                <div class="nav-item" id="authBtn">
+                    <i class="fas fa-user-circle"></i>
+                    <span class="nav-text">Login / Signup</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header>
+                <div class="header-info">
+                    <h1 id="pageTitle">Smart Summarizer</h1>
+                    <p class="text-muted" id="pageSubtitle">AI-powered text analysis and distillation</p>
+                </div>
+                <div class="header-actions">
+                    <div class="badge-group" style="display: flex; gap: 0.5rem;">
+                        <span class="badge" id="inputTypeBadge">General Text</span>
+                        <span class="badge" id="languageBadge">English</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- ═══ Tab: Summarizer ═══ -->
+            <section id="summarizerTab" class="tab-content active">
+                <div class="glass-card input-area animate-fade">
+                    <div class="textarea-header">
+                        <div class="input-methods">
+                            <button class="method-btn active" data-method="text">
+                                <i class="fas fa-keyboard"></i> Paste Text
+                            </button>
+                            <button class="method-btn" data-method="upload">
+                                <i class="fas fa-file-upload"></i> Upload File
+                            </button>
+                            <button class="method-btn" data-method="url">
+                                <i class="fas fa-link"></i> URL Link
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="textInput" class="method-content active">
+                        <textarea id="sourceText" placeholder="Paste your article, research paper, or text here (min 50 chars)..."></textarea>
+                    </div>
+                    
+                    <div id="uploadInput" class="method-content">
+                        <div class="dropzone" id="dropzone">
+                            <i class="fas fa-cloud-arrow-up"></i>
+                            <h3>Drop your file here</h3>
+                            <p>Support for PDF, TXT, DOCX files</p>
+                            <input type="file" id="fileInput" hidden accept=".pdf,.txt,.docx">
+                        </div>
+                    </div>
+
+                    <div id="urlInput" class="method-content">
+                        <div class="url-field" style="margin-top: 2rem;">
+                            <input type="url" id="sourceUrl" class="glass-select" style="width: 100%; border-radius: 16px; padding: 1rem;" placeholder="https://example.com/article">
+                        </div>
+                    </div>
+
+                    <div class="controls-bar">
+                        <div class="summary-options">
+                            <select id="modelSelect" class="glass-select">
+                                <option value="abstractive">Transformer (Abstractive)</option>
+                                <option value="lsa">LSA (Extractive)</option>
+                                <option value="text_rank">TextRank (Scientific)</option>
+                                <option value="lex_rank">LexRank (Balanced)</option>
+                            </select>
+                            
+                            <select id="modeSelect" class="glass-select">
+                                <option value="standard">Standard Summary</option>
+                                <option value="short">Short &amp; Concise</option>
+                                <option value="detailed">Detailed Analysis</option>
+                                <option value="bullets">Bullet Points</option>
+                                <option value="eli5">Explain Like I'm 5</option>
+                            </select>
+                        </div>
+                        
+                        <div class="btn-group-container">
+                            <button id="voiceBtn" class="btn-icon" title="Voice to Text">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <button id="summarizeBtn" class="btn-primary">
+                                <span>Summarize</span>
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="resultsArea" class="results-grid" style="display: none;">
+                    <div class="glass-card output-area animate-fade">
+                        <div class="card-header">
+                            <h3>Summary Result</h3>
+                            <div class="card-actions" style="display: flex; gap: 0.5rem;">
+                                <button class="btn-icon" id="downloadPdfBtn" title="Download PDF"><i class="fas fa-file-pdf"></i></button>
+                                <button class="btn-icon" id="copyBtn" title="Copy Text"><i class="fas fa-copy"></i></button>
+                                <button class="btn-icon" id="speakBtn" title="Read Aloud"><i class="fas fa-volume-up"></i></button>
+                                <button class="btn-icon" id="favoriteBtn" title="Favorite"><i class="far fa-star"></i></button>
+                            </div>
+                        </div>
+                        <div id="summaryResult" class="summary-text outline-none border-none"></div>
+                    </div>
+
+                    <div class="dashboard-grid" id="statsGrid"></div>
+                </div>
+            </section>
+
+            <!-- ═══ Tab: History ═══ -->
+            <section id="historyTab" class="tab-content">
+                <div class="glass-card history-container animate-fade">
+                    <div class="card-header" style="margin-bottom: 2rem;">
+                        <h3>Recent Summaries</h3>
+                        <button class="btn-text" id="clearHistoryBtn">Clear All</button>
+                    </div>
+                    <div id="historyList" class="history-list scrollbar-hidden">
+                        <div class="empty-state">
+                            <i class="fas fa-history" style="font-size: 3rem; opacity: 0.3; margin-bottom: 1rem;"></i>
+                            <p>No recent history found.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ Tab: Analytics ═══ -->
+            <section id="analyticsTab" class="tab-content">
+
+                <!-- KPI Row -->
+                <div class="analytics-kpi-row">
+                    <div class="glass-card kpi-card animate-fade">
+                        <div class="kpi-icon" style="background:rgba(99,102,241,0.12);color:var(--primary);">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div>
+                            <span class="kpi-value" id="kpiTotal">—</span>
+                            <span class="kpi-label">Total Summaries</span>
+                        </div>
+                    </div>
+                    <div class="glass-card kpi-card animate-fade">
+                        <div class="kpi-icon" style="background:rgba(16,185,129,0.12);color:#10b981;">
+                            <i class="fas fa-smile"></i>
+                        </div>
+                        <div>
+                            <span class="kpi-value" id="kpiPositive">—</span>
+                            <span class="kpi-label">Positive Texts</span>
+                        </div>
+                    </div>
+                    <div class="glass-card kpi-card animate-fade">
+                        <div class="kpi-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;">
+                            <i class="fas fa-frown"></i>
+                        </div>
+                        <div>
+                            <span class="kpi-value" id="kpiNegative">—</span>
+                            <span class="kpi-label">Negative Texts</span>
+                        </div>
+                    </div>
+                    <div class="glass-card kpi-card animate-fade">
+                        <div class="kpi-icon" style="background:rgba(14,165,233,0.12);color:var(--secondary);">
+                            <i class="fas fa-upload"></i>
+                        </div>
+                        <div>
+                            <span class="kpi-value" id="kpiUploads">—</span>
+                            <span class="kpi-label">File Uploads</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="analytics-charts-row">
+                    <div class="glass-card chart-card animate-fade">
+                        <div class="chart-card-header">
+                            <h3><i class="fas fa-heart-pulse"></i> Sentiment Distribution</h3>
+                            <span class="chart-badge" id="sentimentDominant">—</span>
+                        </div>
+                        <div class="canvas-wrapper-lg">
+                            <canvas id="sentimentChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="glass-card chart-card animate-fade">
+                        <div class="chart-card-header">
+                            <h3><i class="fas fa-robot"></i> Model Usage</h3>
+                            <span class="chart-badge" id="topModel">—</span>
+                        </div>
+                        <div class="canvas-wrapper-lg">
+                            <canvas id="methodChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Keywords + Readability Row -->
+                <div class="analytics-bottom-row">
+                    <div class="glass-card animate-fade" style="flex:2;">
+                        <div class="chart-card-header">
+                            <h3><i class="fas fa-tags"></i> Top Keywords from History</h3>
+                            <button class="btn-icon-sm" id="refreshAnalyticsBtn" title="Refresh">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        <div id="analyticsKeywordCloud" class="cloud-container" style="margin-top:1.5rem;min-height:80px;">
+                            <span style="color:var(--text-muted);font-size:0.9rem;">Run a summarization to populate keywords…</span>
+                        </div>
+                    </div>
+                    <div class="glass-card animate-fade" style="flex:1;">
+                        <div class="chart-card-header">
+                            <h3><i class="fas fa-gauge-high"></i> Avg Readability</h3>
+                        </div>
+                        <div class="readability-meter-wrapper">
+                            <svg viewBox="0 0 200 110" class="arc-svg">
+                                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--border)" stroke-width="14" stroke-linecap="round"/>
+                                <path id="arcFill" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#arcGrad)" stroke-width="14" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+                                <defs>
+                                    <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stop-color="#ef4444"/>
+                                        <stop offset="50%" stop-color="#f59e0b"/>
+                                        <stop offset="100%" stop-color="#10b981"/>
+                                    </linearGradient>
+                                </defs>
+                                <text x="100" y="98" text-anchor="middle" font-size="22" font-weight="800" fill="var(--text-main)" id="arcScore">—</text>
+                            </svg>
+                            <span class="readability-label" id="readabilityLabel">No data yet</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ Tab: Comparison ═══ -->
+            <section id="compareTab" class="tab-content">
+
+                <!-- Input Panel -->
+                <div class="glass-card animate-fade compare-input-card">
+                    <div class="compare-input-header">
+                        <h3><i class="fas fa-flask"></i> Compare Models Side-by-Side</h3>
+                        <p style="color:var(--text-muted);font-size:0.9rem;margin-top:0.3rem;">
+                            Paste text once, pick two models, and see how they differ.
+                        </p>
+                    </div>
+                    <textarea id="compareText" placeholder="Paste your text here (min 50 characters)…" style="min-height:200px;"></textarea>
+                    <div class="compare-controls">
+                        <div class="compare-model-selector">
+                            <label class="model-label model-label-a">Model A</label>
+                            <select id="compareModelA" class="glass-select compare-select model-a-select">
+                                <option value="lsa">LSA (Extractive)</option>
+                                <option value="text_rank">TextRank (Scientific)</option>
+                                <option value="lex_rank">LexRank (Balanced)</option>
+                                <option value="abstractive">Transformer (Abstractive)</option>
+                            </select>
+                        </div>
+                        <div class="compare-vs-badge">VS</div>
+                        <div class="compare-model-selector">
+                            <label class="model-label model-label-b">Model B</label>
+                            <select id="compareModelB" class="glass-select compare-select model-b-select">
+                                <option value="text_rank" selected>TextRank (Scientific)</option>
+                                <option value="lsa">LSA (Extractive)</option>
+                                <option value="lex_rank">LexRank (Balanced)</option>
+                                <option value="abstractive">Transformer (Abstractive)</option>
+                            </select>
+                        </div>
+                        <div style="margin-left:auto;">
+                            <select id="compareModeSelect" class="glass-select">
+                                <option value="standard">Standard</option>
+                                <option value="short">Short</option>
+                                <option value="detailed">Detailed</option>
+                                <option value="bullets">Bullet Points</option>
+                            </select>
+                        </div>
+                        <button id="compareBtn" class="btn-primary" style="white-space:nowrap;">
+                            <i class="fas fa-play"></i> Run Comparison
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div id="compareResults" style="display:none;">
+                    <div id="winnerBanner" class="winner-banner animate-fade">
+                        <i class="fas fa-trophy"></i>
+                        <span id="winnerText">Running comparison…</span>
+                    </div>
+
+                    <div class="compare-grid">
+                        <!-- Model A -->
+                        <div class="glass-card compare-card animate-fade">
+                            <div class="compare-card-header model-a-header">
+                                <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                                    <span class="compare-model-badge model-a-badge" id="compareModelALabel">Model A</span>
+                                    <span class="compare-stat-pill" id="statWordsA">— words</span>
+                                </div>
+                                <div style="display:flex;gap:0.5rem;">
+                                    <button class="btn-icon" id="copyCompareA" title="Copy"><i class="fas fa-copy"></i></button>
+                                    <button class="btn-icon" id="speakCompareA" title="Read Aloud"><i class="fas fa-volume-up"></i></button>
+                                </div>
+                            </div>
+                            <div id="compareResultA" class="summary-text compare-summary-text"></div>
+                            <div class="compare-stats-row" id="statsRowA"></div>
+                        </div>
+                        <!-- Model B -->
+                        <div class="glass-card compare-card animate-fade">
+                            <div class="compare-card-header model-b-header">
+                                <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                                    <span class="compare-model-badge model-b-badge" id="compareModelBLabel">Model B</span>
+                                    <span class="compare-stat-pill" id="statWordsB">— words</span>
+                                </div>
+                                <div style="display:flex;gap:0.5rem;">
+                                    <button class="btn-icon" id="copyCompareB" title="Copy"><i class="fas fa-copy"></i></button>
+                                    <button class="btn-icon" id="speakCompareB" title="Read Aloud"><i class="fas fa-volume-up"></i></button>
+                                </div>
+                            </div>
+                            <div id="compareResultB" class="summary-text compare-summary-text"></div>
+                            <div class="compare-stats-row" id="statsRowB"></div>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Table -->
+                    <div class="glass-card animate-fade" style="margin-top:1.5rem;">
+                        <div class="chart-card-header">
+                            <h3><i class="fas fa-table-list"></i> Detailed Comparison</h3>
+                        </div>
+                        <div class="compare-table-wrapper">
+                            <table class="compare-table">
+                                <thead>
+                                    <tr>
+                                        <th>Metric</th>
+                                        <th id="tableHeaderA" class="model-a-col">Model A</th>
+                                        <th id="tableHeaderB" class="model-b-col">Model B</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="compareTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Performance Bar Chart -->
+                    <div class="glass-card animate-fade" style="margin-top:1.5rem;">
+                        <div class="chart-card-header">
+                            <h3><i class="fas fa-bolt"></i> Performance Comparison</h3>
+                        </div>
+                        <div style="max-width:600px;margin:1.5rem auto 0;">
+                            <canvas id="compareBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Loading Overlay -->
+            <div id="loader" class="loader-overlay">
+                <div class="loader-content">
+                    <div class="dna-spinner"></div>
+                    <p id="loaderMessage">AI is thinking...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
