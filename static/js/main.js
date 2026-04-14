@@ -28,9 +28,109 @@ document.addEventListener('DOMContentLoaded', () => {
     let methodChartInstance    = null;
     let compareBarChartInstance= null;
 
-    // ── helpers ───────────────────────────────────────────────────────────────
+    // ── Toast Notifications ───────────────────────────────────────────────────
+    // Creates a non-blocking, auto-dismissing notification (replaces alert())
+    function showToast(message, type = 'info', duration = 4500) {
+        let container = document.getElementById('toastContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.style.cssText = [
+                'position:fixed', 'bottom:1.5rem', 'right:1.5rem',
+                'display:flex', 'flex-direction:column', 'gap:0.6rem',
+                'z-index:9999', 'max-width:360px'
+            ].join(';');
+            document.body.appendChild(container);
+        }
+
+        const colors = {
+            info:    { bg: 'rgba(99,102,241,0.95)',  icon: 'ℹ️' },
+            success: { bg: 'rgba(16,185,129,0.95)',  icon: '✅' },
+            warning: { bg: 'rgba(245,158,11,0.95)',  icon: '⚠️' },
+            error:   { bg: 'rgba(239,68,68,0.95)',   icon: '❌' },
+        };
+        const { bg, icon } = colors[type] || colors.info;
+
+        const toast = document.createElement('div');
+        toast.style.cssText = [
+            `background:${bg}`, 'color:#fff', 'padding:0.75rem 1rem',
+            'border-radius:12px', 'font-size:0.875rem', 'line-height:1.4',
+            'box-shadow:0 4px 20px rgba(0,0,0,0.35)',
+            'display:flex', 'align-items:flex-start', 'gap:0.5rem',
+            'opacity:0', 'transform:translateY(12px)',
+            'transition:opacity 0.3s ease, transform 0.3s ease',
+            'backdrop-filter:blur(8px)', 'cursor:pointer'
+        ].join(';');
+        toast.innerHTML = `<span style="font-size:1rem;flex-shrink:0">${icon}</span><span>${message}</span>`;
+        toast.onclick = () => dismissToast(toast);
+        container.appendChild(toast);
+
+        // Animate in
+        requestAnimationFrame(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        });
+
+        const timer = setTimeout(() => dismissToast(toast), duration);
+        toast._timer = timer;
+
+        function dismissToast(t) {
+            clearTimeout(t._timer);
+            t.style.opacity = '0';
+            t.style.transform = 'translateY(12px)';
+            setTimeout(() => t.remove(), 300);
+        }
+    }
+
+    // ── Model Status Badge ────────────────────────────────────────────────────
+    // Injects a live status pill into the navbar and polls /api/health every 30s
+    function initModelStatusBadge() {
+        const nav = document.querySelector('.nav-actions') || document.querySelector('nav');
+        if (!nav) return;
+
+        const badge = document.createElement('span');
+        badge.id = 'modelStatusBadge';
+        badge.style.cssText = [
+            'font-size:0.72rem', 'padding:0.25rem 0.65rem', 'border-radius:999px',
+            'font-weight:600', 'letter-spacing:0.03em', 'cursor:default',
+            'transition:background 0.4s,color 0.4s', 'white-space:nowrap',
+            'background:rgba(148,163,184,0.2)', 'color:var(--text-muted,#94a3b8)'
+        ].join(';');
+        badge.textContent = '⬤ Checking…';
+        nav.prepend(badge);
+
+        async function pollHealth() {
+            try {
+                const res  = await fetch('/api/health', { signal: AbortSignal.timeout(5000) });
+                const data = await res.json();
+
+                if (data.model_status === 'ready') {
+                    badge.textContent = '🟢 AI Ready';
+                    badge.style.background = 'rgba(16,185,129,0.15)';
+                    badge.style.color = '#10b981';
+                } else if (data.model_status === 'fallback') {
+                    badge.textContent = '🟡 Fallback Mode';
+                    badge.style.background = 'rgba(245,158,11,0.15)';
+                    badge.style.color = '#f59e0b';
+                } else {
+                    throw new Error('unhealthy');
+                }
+            } catch (_) {
+                badge.textContent = '🔴 Offline';
+                badge.style.background = 'rgba(239,68,68,0.15)';
+                badge.style.color = '#ef4444';
+            }
+        }
+
+        pollHealth();
+        setInterval(pollHealth, 30_000);
+    }
+
+    initModelStatusBadge();
+
+    // ── Loader ────────────────────────────────────────────────────────────────
     function showLoader(show, msg = 'AI is thinking…') {
-        loader.style.display = show ? 'flex' : 'none';
+        if (loader) loader.style.display = show ? 'flex' : 'none';
         if (loaderMsg) loaderMsg.textContent = msg;
         if (summarizeBtn) summarizeBtn.disabled = show;
     }
@@ -129,24 +229,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const mode   = document.getElementById('modeSelect')?.value  || 'standard';
 
             showLoader(true, method === 'abstractive'
-                ? 'BART model is generating… (~15-30 s)'
-                : 'Summarizing…');
-
-            // Pre-flight health check
-            try {
-                const h = await fetch('/api/health', { signal: AbortSignal.timeout(4000) });
-                if (!h.ok) throw new Error('unhealthy');
-            } catch (_) {
-                showLoader(false);
-                alert('Cannot connect to the server.\nEnsure the Flask backend is running on port 5000.');
-                return;
-            }
+                ? 'Transformer model generating… (may take ~15-30 s on cold start)'
+                : 'Extractive model summarizing…');
 
             try {
                 let response;
                 if (activeMethod === 'upload') {
                     const file = fileInput?.files[0];
-                    if (!file) { alert('Please select a file first.'); showLoader(false); return; }
+                    if (!file) {
+                        showToast('Please select a file before summarizing.', 'warning');
+                        showLoader(false);
+                        return;
+                    }
                     const fd = new FormData();
                     fd.append('file', file);
                     fd.append('method', method);
@@ -155,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     const text = sourceText.value.trim();
                     if (!text || text.length < 50) {
-                        alert('Please enter at least 50 characters to summarize.');
+                        showToast('Please enter at least 50 characters to summarize.', 'warning');
                         showLoader(false);
                         return;
                     }
@@ -169,14 +263,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 if (data.success) {
                     displayResults(data);
+                    if (data.fallback_used) {
+                        showToast(
+                            'The AI model is loading. Extractive (LSA) fallback was used — try again in a moment for full BART output.',
+                            'warning',
+                            6000
+                        );
+                    }
                 } else {
-                    alert(`Summarization Error: ${data.error || 'Server rejected the request.'}`);
+                    showToast(`Summarization failed: ${data.error || 'Server rejected the request.'}`, 'error');
                 }
             } catch (err) {
                 console.error('[Summarize]', err);
-                alert(err.name === 'AbortError'
-                    ? 'Request timed out. Try a shorter text or an extractive model (LSA / TextRank).'
-                    : 'Connection lost during processing. Please refresh and try again.');
+                showToast(
+                    err.name === 'AbortError' || err.name === 'TimeoutError'
+                        ? 'Request timed out. Try a shorter text or switch to LSA / TextRank.'
+                        : 'Connection lost during processing. Please check your server and try again.',
+                    'error'
+                );
             } finally {
                 showLoader(false);
             }
@@ -496,8 +600,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const hasAbstractive = modelA === 'abstractive' || modelB === 'abstractive';
             showLoader(true, hasAbstractive
-                ? 'Running both models — BART may take ~15-30 s…'
-                : 'Running both models…');
+                ? 'Running both models — BART may take ~15-30 s on cold start…'
+                : 'Running both extractive models…');
 
             try {
                 const res  = await fetch('/api/compare', {
@@ -508,14 +612,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
 
                 if (!data.success) {
-                    alert(`Comparison Error: ${data.error}`);
+                    showToast(`Comparison failed: ${data.error}`, 'error');
                     return;
                 }
 
                 renderCompareResults(data, modelA, modelB);
             } catch (err) {
                 console.error('[Compare]', err);
-                alert('Comparison failed. Check that the backend is running.');
+                showToast('Comparison request failed. Ensure the backend server is running.', 'error');
             } finally {
                 showLoader(false);
             }
@@ -643,11 +747,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Copy / Speak buttons for compare
         document.getElementById('copyCompareA').onclick = () => {
             navigator.clipboard.writeText(mA.summary);
-            alert('Model A summary copied!');
+            showToast('Model A summary copied!', 'success', 2500);
         };
         document.getElementById('copyCompareB').onclick = () => {
             navigator.clipboard.writeText(mB.summary);
-            alert('Model B summary copied!');
+            showToast('Model B summary copied!', 'success', 2500);
         };
         document.getElementById('speakCompareA').onclick = () =>
             window.speechSynthesis.speak(new SpeechSynthesisUtterance(mA.summary));
@@ -681,12 +785,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.body.appendChild(a);
                     a.click();
                     a.remove();
+                    showToast('PDF downloaded successfully!', 'success', 3000);
                 } else {
-                    alert('PDF generation failed.');
+                    showToast('PDF generation failed on the server. Please try again.', 'error');
                 }
             } catch (err) {
                 console.error('Download error:', err);
-                alert('Connection error during PDF download.');
+                showToast('Connection error during PDF download. Please try again.', 'error');
             } finally {
                 showLoader(false);
             }
@@ -700,7 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (copyBtn) {
         copyBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(summaryResult.textContent);
-            alert('Summary copied to clipboard!');
+            showToast('Summary copied to clipboard!', 'success', 2500);
         });
     }
     if (speakBtn) {

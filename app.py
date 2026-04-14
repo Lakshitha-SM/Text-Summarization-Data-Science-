@@ -2,7 +2,12 @@
 AI Text Summarization Web Application
 --------------------------------------
 Main Flask application entry point.
-Loads the HuggingFace BART model once at startup for performance.
+
+Startup sequence:
+  1. Load env vars
+  2. Download NLTK data (each independently, failures are non-fatal)
+  3. Load HuggingFace model (failure sets degraded flag, app still runs)
+  4. Register blueprints
 """
 
 import os
@@ -14,7 +19,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file (if present)
 load_dotenv()
 
-# Configure logging
+# ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -22,56 +27,66 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_app():
-    """Application factory function."""
+def _download_nltk_data():
+    """Download required NLTK corpora. Each is attempted independently."""
+    import nltk
+    for resource in ("punkt", "punkt_tab", "stopwords"):
+        try:
+            nltk.download(resource, quiet=True)
+            logger.info("NLTK '%s' ready.", resource)
+        except Exception as exc:
+            logger.warning("NLTK '%s' download skipped: %s", resource, exc)
+
+
+def _preload_model():
+    """
+    Load the HuggingFace model at startup.
+    On failure the app continues in degraded (extractive-only) mode.
+    """
+    from summarizer.abstractive import load_model, _model_failed
+    logger.info("Pre-loading summarization model — please wait …")
+    try:
+        load_model()
+        logger.info("✅ Summarization model ready.")
+    except Exception as exc:
+        logger.error(
+            "⚠️  Model load failed — app will run in extractive-only mode. Error: %s", exc
+        )
+
+
+def create_app() -> Flask:
+    """Application factory."""
     app = Flask(__name__, template_folder="templates", static_folder="static")
 
     # ── Configuration ──────────────────────────────────────────────────────────
     app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
     app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(__file__), "uploads")
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "prod-secret-key-12345")
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "prod-secret-key-change-me")
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
+        "DATABASE_URL", "sqlite:///app.db"
+    )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    # Create uploads directory if it does not exist
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     # ── CORS & Database ────────────────────────────────────────────────────────
     CORS(app, resources={r"/api/*": {"origins": "*"}})
-    
+
     from utils.database import init_db
     init_db(app)
 
-    # ── Pre-load models ────────────────────────────────────────────────────────
-    # This runs once at startup so every request reuses the same pipeline object.
-    logger.info("Downloading NLTK dependencies...")
-    try:
-        import nltk
-        nltk.download('punkt', quiet=True)
-        nltk.download('punkt_tab', quiet=True)
-        nltk.download('stopwords', quiet=True)
-        logger.info("NLTK dependencies ready.")
-    except Exception as exc:
-        logger.warning(f"NLTK download failed: {exc}")
+    # ── NLTK & Model (startup tasks) ───────────────────────────────────────────
+    _download_nltk_data()
+    _preload_model()
 
-    logger.info("Loading HuggingFace BART summarization model — please wait …")
-    try:
-        from summarizer.abstractive import load_model
-        load_model()
-        logger.info("BART model loaded successfully.")
-    except Exception as exc:
-        logger.error(f"Critical: Could not load BART model at startup: {exc}")
-
-    # ── Blueprint registration ──────────────────────────────────────────────────
+    # ── Blueprints ─────────────────────────────────────────────────────────────
     from routes.api import api_bp
     from routes.views import views_bp
-
-    logger.info("ROUTING DEBUG: api_bp is from %s", getattr(api_bp, '__file__', 'unknown'))
 
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(views_bp)
 
-    logger.info("Flask app created and blueprints registered.")
+    logger.info("🚀 Flask app ready. All blueprints registered.")
     return app
 
 
@@ -80,8 +95,8 @@ app = create_app()
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
-    debug = os.getenv("FLASK_DEBUG", "true").lower() == "true"
-    logger.info("Starting development server on port %d …", port)
-    # use_reloader=False prevents Flask from importing app.py twice,
-    # which would double-load the BART model and crash on low-RAM machines.
+    # Debug off by default — enable via FLASK_DEBUG=true for local dev
+    debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    logger.info("Starting development server on port %d (debug=%s) …", port, debug)
+    # use_reloader=False prevents double-loading BART on low-RAM machines
     app.run(host="0.0.0.0", port=port, debug=debug, use_reloader=False)
